@@ -1,0 +1,63 @@
+{
+  "model": "claude-opus-4-8",
+  "permissions": {
+    "defaultMode": "auto",
+    "allow": [
+      "Bash(git:*)",
+      "Bash(grep:*)",
+      "Bash(tail:*)",
+      "Bash(head:*)",
+      "Bash(awk:*)",
+      "Bash(sed:*)",
+      "Bash(wc:*)",
+      "Bash(cat:*)",
+      "Bash(ls:*)",
+      "Bash(find:*)",
+      "Bash(echo:*)",
+      "Bash(cd:*)",
+      "Bash(seq:*)",
+      "Bash(pgrep:*)",
+      "Bash(test:*)",
+      "Bash(scripts/*.sh:*)",
+      "Bash(uv:*)",
+      "Bash(.worktrees/*/runs/staging/.venv/bin/python:*)",
+      "Bash(.base-venv/bin/python:*)",
+      "Bash(timeout:*)",
+      "Bash(mkdir:*)",
+      "Bash(rmdir:*)",
+      "Bash(rm:*)",
+      "Bash(mv:*)",
+      "Bash(cp:*)",
+      "Bash(cp -r:*)",
+      "Bash(ln:*)",
+      "Bash(ln -s:*)",
+      "Bash(CUDA_VISIBLE_DEVICES=*:*)",
+      "Bash(wait:*)",
+      "Bash(jobs:*)",
+      "Bash(kill:*)",
+      "Bash(nvidia-smi:*)",
+      "Bash(tail -F:*)",
+      "Bash(tail -f:*)",
+      "Read(*)",
+      "Edit(.worktrees/**)",
+      "Write(.worktrees/**)",
+      "Agent(*)",
+      "WebSearch",
+      "WebFetch"
+    ],
+    "additionalDirectories": []
+  },
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Edit|Write|NotebookEdit|MultiEdit|Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/guard.py"
+          }
+        ]
+      }
+    ]
+  }
+}

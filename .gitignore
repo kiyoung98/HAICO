@@ -1,0 +1,30 @@
+# Generated artifacts
+data/
+runs/
+checkpoints/
+wandb/
+
+# Held-out blobs materialized into secret/ (the loader secret/*.py stays tracked)
+secret/*.pt
+secret/*.npy
+secret/_*
+
+# Python caches / venv
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+.base-venv/
+
+# Parallel runtime
+.worktrees/
+events.log
+
+# Auxiliary / non-execution material
+docs/
+plots/
+CLAUDE.md
+figures/
+paper/
+results/
+*.pdf
