@@ -1,0 +1,31 @@
+# Generated artifacts
+data/
+runs/
+checkpoints/
+wandb/
+
+# Python caches / venv
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+.base-venv/
+
+# Parallel runtime
+.worktrees/
+.slots/
+
+# Auxiliary / non-execution material
+docs/
+# ...except the interactive search-tree GitHub Pages site
+!docs/
+!docs/index.html
+!docs/discovery-tree.json
+plots/
+CLAUDE.md
+figures/
+maskgxt/
+paper/
+blog/
+results/
+*.pdf

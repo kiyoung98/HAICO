@@ -1,0 +1,100 @@
+{
+  "permissions": {
+    "defaultMode": "auto",
+    "allow": [
+      "Bash(git:*)",
+      "Bash(grep:*)",
+      "Bash(tail:*)",
+      "Bash(head:*)",
+      "Bash(awk:*)",
+      "Bash(sed:*)",
+      "Bash(wc:*)",
+      "Bash(cat:*)",
+      "Bash(ls:*)",
+      "Bash(find:*)",
+      "Bash(echo:*)",
+      "Bash(cd:*)",
+      "Bash(seq:*)",
+      "Bash(pgrep:*)",
+      "Bash(test:*)",
+      "Bash(scripts/*.sh:*)",
+      "Bash(uv:*)",
+      "Bash(.worktrees/*/runs/staging/.venv/bin/python:*)",
+      "Bash(.base-venv/bin/python:*)",
+      "Bash(timeout:*)",
+      "Bash(mkdir:*)",
+      "Bash(rmdir:*)",
+      "Bash(rm:*)",
+      "Bash(mv:*)",
+      "Bash(cp:*)",
+      "Bash(cp -r:*)",
+      "Bash(ln:*)",
+      "Bash(ln -s:*)",
+      "Bash(CUDA_VISIBLE_DEVICES=*:*)",
+      "Bash(wait:*)",
+      "Bash(jobs:*)",
+      "Bash(kill:*)",
+      "Bash(nvidia-smi:*)",
+      "Bash(tail -F:*)",
+      "Bash(tail -f:*)",
+      "Read(*)",
+      "Edit(.worktrees/**)",
+      "Write(.worktrees/**)",
+      "Edit(.slots/**)",
+      "Write(.slots/**)",
+      "Agent(*)",
+      "WebSearch",
+      "WebFetch"
+    ],
+    "deny": [
+      "Edit(evaluate.py)",
+      "Write(evaluate.py)",
+      "Edit(prepare.py)",
+      "Write(prepare.py)",
+      "Edit(requirements.txt)",
+      "Write(requirements.txt)",
+      "Edit(data/**)",
+      "Write(data/**)",
+      "Bash(git push:*)",
+      "Bash(git push --force:*)",
+      "Bash(git push --force-with-lease:*)",
+      "Bash(git push -f:*)"
+    ],
+    "additionalDirectories": []
+  },
+  "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "compact",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "cat \"$CLAUDE_PROJECT_DIR\"/program.md"
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "Edit|Write|NotebookEdit|MultiEdit|Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/guard.py"
+          }
+        ]
+      }
+    ],
+    "SubagentStop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "mkdir -p \"$CLAUDE_PROJECT_DIR\"/.slots && printf 'subagent_stop %s\\n' \"$(date +%s)\" >> \"$CLAUDE_PROJECT_DIR\"/.slots/events.log"
+          }
+        ]
+      }
+    ]
+  },
+  "_comment": "Launch with --dangerously-skip-permissions for an unattended, never-stalling loop. Integrity is enforced by the PreToolUse guard hook (.claude/hooks/guard.py), which hard-blocks edits to evaluate.py/prepare.py/requirements.txt/program.md/contract.md/scripts/**/.claude/**/data/** and any git push, even under bypass. The defaultMode/allow/deny below only apply if you instead run in auto mode."
+}

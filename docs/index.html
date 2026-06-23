@@ -1,0 +1,351 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>HACO · Discovery search tree</title>
+    <meta
+      name="description"
+      content="The real autoresearch search tree behind MaskGXT: an AI co-scientist tries 14 generative-modeling paradigms from different fields, and only the masked-generative (MaskGIT) lineage survives."
+    />
+    <script src="https://cdn.jsdelivr.net/npm/d3@7.9.0/dist/d3.min.js"></script>
+    <style>
+      /* Palette mirrors VisualTreeSearch (sky / slate, soft cards). */
+      :root {
+        --bg-1: #f0f9ff;        /* sky-50  */
+        --bg-2: #ffffff;
+        --card: #ffffff;
+        --border: #e2e8f0;      /* slate-200 */
+        --ink: #0f172a;         /* slate-900 */
+        --ink-dim: #64748b;     /* slate-500 */
+        --sky-950: #082f49;
+        --primary: #0ea5e9;     /* sky-500 */
+        /* node status */
+        --ok: #3b82f6;          /* blue-500 (the "good"/expanded lineage) */
+        --buggy: #f59e0b;       /* amber-500 */
+        --crash: #ef4444;       /* red-500   */
+        --seed: #10b981;        /* emerald-500 */
+        --link: #94a3b8;        /* slate-400 */
+        --win: #10b981;
+        /* stage ring colours (node outline by training-budget stage) */
+        --st-2h: #9ca3af;       /* neutral gray */
+        --st-12h: #8b5cf6;      /* violet */
+        --st-samp: #ec4899;     /* pink   */
+      }
+      @media (prefers-color-scheme: dark) {
+        :root {
+          --bg-1: #0f172a;      /* slate-900 */
+          --bg-2: #1e293b;      /* slate-800 */
+          --card: #1e293b;
+          --border: #334155;    /* slate-700 */
+          --ink: #e2e8f0;
+          --ink-dim: #94a3b8;
+          --sky-950: #e0f2fe;
+          --ok: #60a5fa;
+          --buggy: #fbbf24;
+          --crash: #f87171;
+          --seed: #34d399;
+          --link: #64748b;
+          --win: #34d399;
+          --st-2h: #9ca3af;       /* neutral gray */
+          --st-12h: #a78bfa;
+          --st-samp: #f472b6;
+        }
+      }
+      * { box-sizing: border-box; }
+      html, body { margin: 0; height: 100%; }
+      body {
+        height: 100%;
+        background: linear-gradient(to bottom, var(--bg-1), var(--bg-2));
+        color: var(--ink);
+        font: 14px/1.5 ui-sans-serif, system-ui, -apple-system, "Segoe UI",
+          Roboto, Helvetica, Arial, sans-serif;
+        overflow: hidden;
+      }
+      .app {
+        display: flex; flex-direction: column; height: 100%;
+      }
+
+      /* Card header — like VTS TreeVisual top bar */
+      .card-head {
+        padding: 12px 18px;
+        border-bottom: 1px solid var(--border);
+        background: linear-gradient(to right, var(--bg-1), var(--card));
+      }
+      .card-head h1 {
+        margin: 0; font-size: 16px; font-weight: 650; color: var(--sky-950);
+        display: flex; align-items: center; gap: 8px;
+      }
+      .card-head .icon {
+        width: 18px; height: 18px; color: var(--primary); flex: none;
+      }
+      .card-head p {
+        margin: 6px 0 0; color: var(--ink-dim); font-size: 12.5px; max-width: 92ch;
+      }
+      .card-head a { color: var(--primary); text-decoration: none; }
+
+      .legend {
+        display: flex; flex-wrap: wrap; gap: 14px; margin-top: 10px;
+        font-size: 12px; color: var(--ink-dim); align-items: center;
+      }
+      .legend .item { display: flex; align-items: center; gap: 5px; }
+      .legend .dot {
+        width: 11px; height: 11px; border-radius: 50%; display: inline-block;
+        border: 1px solid rgba(120, 130, 150, 0.4);
+      }
+      .legend .sizehint .dot.s { width: 6px; height: 6px; }
+      .legend .sizehint .dot.l { width: 14px; height: 14px; }
+      .legend .winline { width: 18px; height: 2.5px; background: var(--win); display: inline-block; border-radius: 2px; }
+      .legend .ring { width: 11px; height: 11px; border-radius: 50%; display: inline-block; border: 2.5px solid; background: transparent; }
+      .legend .sep { color: var(--border); margin: 0 2px; }
+      .legend .diamond { width: 11px; height: 11px; display: inline-block; background: var(--seed); transform: rotate(45deg); border-radius: 2px; }
+
+      /* Stage */
+      #stage { position: relative; flex: 1; min-height: 0; }
+      svg { width: 100%; height: 100%; display: block; cursor: grab; }
+      svg.grabbing { cursor: grabbing; }
+      .link { fill: none; stroke: var(--link); stroke-width: 1.5px; stroke-opacity: 0.7; }
+      .link.win { stroke: var(--win); stroke-width: 2.5px; stroke-opacity: 0.9; }
+      .node circle { cursor: pointer; transition: r 0.15s; }
+      .node text {
+        font-size: 12px; fill: var(--ink); font-weight: 450; paint-order: stroke;
+        stroke: var(--bg-2); stroke-width: 2px; stroke-linejoin: round;
+        pointer-events: none;
+        -webkit-text-size-adjust: 100%; text-rendering: optimizeLegibility;
+      }
+      /* Mobile: thin the halo and lighten the weight so the small METRe
+         numbers stay legible instead of clumping into a thick blob. */
+      @media (max-width: 600px) {
+        .node text {
+          font-size: 13px; font-weight: 400; stroke-width: 1.5px;
+        }
+      }
+
+      /* Tooltip — VTS style floating card */
+      .tooltip {
+        position: absolute; pointer-events: none; opacity: 0;
+        background: var(--card); color: var(--ink);
+        border: 1px solid var(--border); border-radius: 6px;
+        padding: 9px 12px; font-size: 12.5px; line-height: 1.45; max-width: 320px;
+        box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1), 0 2px 4px -1px rgba(0,0,0,0.06);
+        transition: opacity 0.15s; z-index: 50;
+      }
+
+    </style>
+  </head>
+  <body>
+    <div class="app">
+      <div class="card-head">
+        <h1>
+          <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="5" r="2.5"/><circle cx="5" cy="19" r="2.5"/><circle cx="19" cy="19" r="2.5"/><path d="M12 7.5v4M12 11.5l-5 5M12 11.5l5 5"/></svg>
+          How an AI co-scientist found MaskGXT
+        </h1>
+        <p>
+          Each node is one model the agent wrote, scored on validation METRe.
+          The budget escalates 2h training &rarr; 12h training &rarr; 30m
+          sampling; the larger <strong>seed</strong> nodes mark each transition.
+          Drag to pan, scroll to zoom, hover a node for details, and click a
+          node to expand or collapse its subtree.
+        </p>
+        <div class="legend">
+          <span class="item"><span class="dot" style="background: var(--ok)"></span> ran ok</span>
+          <span class="item"><span class="dot" style="background: var(--buggy)"></span> buggy</span>
+          <span class="item sizehint">size = METRe&nbsp;<span class="dot s" style="background: var(--ink-dim)"></span>→<span class="dot l" style="background: var(--ink-dim)"></span></span>
+          <span class="item"><span class="winline"></span>&nbsp;path to best model</span>
+          <span class="item"><span class="diamond"></span> seed (budget transition)</span>
+          <span class="sep">·</span>
+          <span class="item">stage:</span>
+          <span class="item"><span class="ring" style="border-color: var(--st-2h)"></span> 2h</span>
+          <span class="item"><span class="ring" style="border-color: var(--st-12h)"></span> 12h</span>
+          <span class="item"><span class="ring" style="border-color: var(--st-samp)"></span> sampling</span>
+        </div>
+      </div>
+
+      <div id="stage">
+        <svg id="tree"></svg>
+      </div>
+    </div>
+
+    <script>
+      function cssv(v) {
+        return getComputedStyle(document.documentElement).getPropertyValue(v).trim();
+      }
+      const STATUS_COLOR = {
+        ok: cssv("--ok"), buggy: cssv("--buggy"),
+        crash: cssv("--crash"), seed: cssv("--seed"),
+      };
+      const colorFor = (d) =>
+        d.data.operator === "seed" ? STATUS_COLOR.seed : (STATUS_COLOR[d.data.status] || "#94a3b8");
+      const STAGE_COLOR = { "2h": cssv("--st-2h"), "12h": cssv("--st-12h"), sampling: cssv("--st-samp") };
+      const strokeFor = (d) => STAGE_COLOR[d.data.stage] || cssv("--st-2h");
+      // budget-transition markers: the root and each stage's seed/base node
+      const isTransition = (d) =>
+        d.data.id === "root" || d.data.operator === "seed" || d.data.operator === "base";
+      const radiusFor = (d) => {
+        const m = d.data.val_metre;
+        if (m == null) return 4;
+        return 5 + 11 * m;
+      };
+      const esc = (s) =>
+        (s == null ? "" : String(s)).replace(/[&<>]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c]));
+
+      const svg = d3.select("#tree");
+      const gAll = svg.append("g");
+      const gLink = gAll.append("g");
+      const gNode = gAll.append("g");
+      const tooltip = d3.select("body").append("div").attr("class", "tooltip");
+
+      let root, treeLayout, zoom, diagonal, bestId = null;
+
+      d3.json("discovery-tree.json").then((data) => {
+        bestId = data.bestId;
+        const byId = {};
+        data.nodes.forEach((n) => (byId[n.id] = Object.assign({}, n, { children: [] })));
+        const eff = {};
+        function reachesUp(s, t) { let c = s, g = 0; while (c && g++ < 1e5) { if (c === t) return true; c = eff[c] || null; } return false; }
+        data.nodes.forEach((n) => {
+          if (n.parent && byId[n.parent] && n.id !== n.parent && !reachesUp(n.parent, n.id)) {
+            byId[n.parent].children.push(byId[n.id]);
+            eff[n.id] = n.parent;
+          }
+        });
+        const rootData = byId[data.rootId] || data.nodes[0];
+        (function sortRec(n) {
+          if (!n.children) return;
+          n.children.sort((a, b) => (b.val_metre || 0) - (a.val_metre || 0));
+          n.children.forEach(sortRec);
+        })(rootData);
+
+        root = d3.hierarchy(rootData);
+        diagonal = d3.linkHorizontal().x((d) => d.y).y((d) => d.x);
+        treeLayout = d3.tree().nodeSize([22, 210]).separation((a, b) => (a.parent === b.parent ? 1.1 : 1.4));
+
+        collapseOffPath();
+
+        zoom = d3.zoom().scaleExtent([0.08, 3]).on("zoom", (e) => gAll.attr("transform", e.transform));
+        svg.call(zoom);
+        svg.on("mousedown", () => svg.classed("grabbing", true));
+        d3.select(window).on("mouseup", () => svg.classed("grabbing", false));
+
+        update();
+        setTimeout(fit, 60);
+      });
+
+      function subtreeHasWin(d) {
+        if (d.data.onWinningPath) return true;
+        const kids = d.children || d._children || [];
+        return kids.some(subtreeHasWin);
+      }
+      function collapseOffPath() {
+        root.each((d) => { if (d._children) { d.children = d._children; d._children = null; } });
+        root.eachAfter((d) => {
+          if (!d.children) return;
+          d.children.forEach((c) => {
+            if (!subtreeHasWin(c)) { c._children = c.children; c.children = null; }
+          });
+        });
+      }
+
+      function update() {
+        treeLayout(root);
+        const nodes = root.descendants();
+        const links = root.links();
+
+        const link = gLink.selectAll("path").data(links, (d) => d.target.data.id);
+        link.enter().append("path")
+          .merge(link)
+          .attr("class", (d) => "link" + (d.target.data.onBestPath ? " win" : ""))
+          .attr("d", (d) => {
+            // VTS-style smooth horizontal bezier
+            const sy = d.source.y, sx = d.source.x, ty = d.target.y, tx = d.target.x;
+            const my = (sy + ty) / 2;
+            return `M${sy},${sx}C${my},${sx} ${my},${tx} ${ty},${tx}`;
+          });
+        link.exit().remove();
+
+        const node = gNode.selectAll("g.node").data(nodes, (d) => d.data.id);
+        const enter = node.enter().append("g").attr("class", "node")
+          .on("click", (event, d) => {
+            if (d.children) { d._children = d.children; d.children = null; }
+            else if (d._children) { d.children = d._children; d._children = null; }
+            update();
+          })
+          .on("mouseover", (event, d) => {
+            const n = d.data;
+            tooltip.html(
+              "<div style='font-weight:600'>" + esc(shortLabel(n)) + "</div>"
+            ).style("opacity", 1)
+              .style("left", (event.pageX + 14) + "px")
+              .style("top", (event.pageY - 20) + "px");
+          })
+          .on("mousemove", (event) => tooltip.style("left", (event.pageX + 14) + "px").style("top", (event.pageY - 20) + "px"))
+          .on("mouseout", () => tooltip.style("opacity", 0));
+        enter.append("circle");
+        enter.append("rect"); // budget-transition (seed/base) marker — diamond
+        enter.append("text");
+
+        const all = enter.merge(node);
+        all.attr("transform", (d) => `translate(${d.y},${d.x})`);
+        // ordinary trials: circle (hidden for transition nodes)
+        all.select("circle")
+          .attr("display", (d) => (isTransition(d) ? "none" : null))
+          .attr("r", (d) => (d.data.id === bestId ? radiusFor(d) + 2 : radiusFor(d)))
+          .attr("fill", colorFor)
+          .attr("stroke", (d) => (d.data.id === bestId ? cssv("--win") : strokeFor(d)))
+          .attr("stroke-width", (d) => (d.data.id === bestId ? 3.5 : d._children ? 3 : 2));
+        // budget-transition nodes: a larger rotated square (diamond) so the
+        // 2h -> 12h -> 30m-sampling handoffs are obvious at a glance.
+        all.select("rect")
+          .attr("display", (d) => (isTransition(d) ? null : "none"))
+          .attr("width", 18).attr("height", 18)
+          .attr("x", -9).attr("y", -9)
+          .attr("transform", "rotate(45)")
+          .attr("rx", 2)
+          .attr("fill", cssv("--seed"))
+          .attr("stroke", cssv("--bg-2"))
+          .attr("stroke-width", 2);
+        all.select("text")
+          .attr("x", (d) => (d.children || d._children ? -10 : 10))
+          .attr("text-anchor", (d) => (d.children || d._children ? "end" : "start"))
+          .attr("dy", "0.32em")
+          .text((d) => labelFor(d));
+        node.exit().remove();
+      }
+
+      function shortLabel(n) {
+        if (n.id === "root") return "root";
+        if (n.operator === "seed") return "seed";
+        return n.title || n.cell || n.id;
+      }
+      function labelFor(d) {
+        const n = d.data;
+        if (n.id === "root") return "root";
+        if (n.operator === "seed") return "seed";
+        if (d._children) {
+          // collapsed: show how many trials are hidden underneath
+          const k = countDesc(d);
+          return "▸ " + k;
+        }
+        if (n.operator === "seedcheck") return ""; // 230 seed re-evals — keep silent
+        if (n.val_metre != null) return n.val_metre.toFixed(3);
+        return "";
+      }
+      function countDesc(d) {
+        let k = 0;
+        (d._children || d.children || []).forEach((c) => { k += 1 + countDesc(c); });
+        return k;
+      }
+      function fit() {
+        const b = gAll.node().getBBox();
+        if (!b.width || !b.height) return;
+        const stage = document.getElementById("stage");
+        const W = stage.clientWidth, H = stage.clientHeight, pad = 50;
+        const scale = Math.min(2, Math.max(0.08, Math.min((W - pad) / b.width, (H - pad) / b.height)));
+        const tx = (W - b.width * scale) / 2 - b.x * scale;
+        const ty = (H - b.height * scale) / 2 - b.y * scale;
+        svg.transition().duration(400).call(zoom.transform, d3.zoomIdentity.translate(tx, ty).scale(scale));
+      }
+      window.addEventListener("resize", () => setTimeout(fit, 80));
+    </script>
+  </body>
+</html>
