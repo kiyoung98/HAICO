@@ -1,6 +1,7 @@
 # HACO: Human-AI Co-discovery system
 
 [![arXiv](https://img.shields.io/badge/arXiv-2606.22866-b31b1b.svg)](https://arxiv.org/abs/2606.22866)
+[![Blog](https://img.shields.io/badge/Blog-MaskGXT-blue.svg)](https://sungsoo-ahn.github.io/blog/2026/maskgxt-ai-coscientist/)
 
 An **AI co-scientist** for crystal structure prediction (CSP). It searches
 generative paradigms and architectures across fields, transfers a promising one
