@@ -94,11 +94,13 @@ trunk off `main`, then bootstrap (clean tree required).
 ```
 git clone https://github.com/kiyoung98/HACO && cd HACO
 git checkout -b agent/root
-scripts/bootstrap.sh run_tag=<run_tag> [gpus=all] [train_minutes=120] [sample_minutes=60] [smoke_seconds=120]
+scripts/bootstrap.sh run_tag=<run_tag> [gpus=all] [train_minutes=120] [sample_minutes=60] [smoke_seconds=120] [noise_sigma=0.004]
 ```
 
 Only `run_tag` is required; omitted arguments use their defaults (`gpus`=all,
-`train_minutes`=120, `sample_minutes`=60, `smoke_seconds`=120).
+`train_minutes`=120, `sample_minutes`=60, `smoke_seconds`=120, `noise_sigma`=0.004).
+`noise_sigma` is the run-to-run standard deviation of METRe across seeds for an
+unchanged `train.py`.
 
 **2. Launch** — start Claude Code with `--dangerously-skip-permissions` in tmux
 and send:
